@@ -11,7 +11,7 @@ CELL_SIZE = 40
 BOARD_WIDTH = BOARD_HEIGHT = BOARD_SIZE * CELL_SIZE
 
 # 색상 정의
-bg_color = (128, 128, 128)
+BOARD_COLOR = (128, 128, 128)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
@@ -52,7 +52,7 @@ def get_opposite_color(color):
 
 def ai(color, board):
     # AI 알고리즘 구현 부분
-    # 우선도 맵을 초기화합니다.
+    # 우선도 맵을 초기화
     priority = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=int)
     max_priority = float('-inf')
     max_coords = []
@@ -61,16 +61,61 @@ def ai(color, board):
         if is_on_board(x, y) and board[x][y] == EMPTY:
             priority[x][y] += value
 
-    # 돌 주변 빈 공간에 우선도를 설정합니다.
+    def is_empty(x, y):
+        return is_on_board(x, y) and board[x][y] == EMPTY
+
+    def is_color(x, y, stone_color):
+        return is_on_board(x, y) and board[x][y] == stone_color
+
+    def check_sequence(x, y, dx, dy, target_color, length, empty_sides_required):
+        count = 0
+        empty_sides = 0
+        for i in range(-empty_sides_required, length + empty_sides_required):
+            nx, ny = x + dx * i, y + dy * i
+            if is_color(nx, ny, target_color):
+                count += 1
+            elif is_empty(nx, ny):
+                empty_sides += 1
+            else:
+                break
+        return count == length and empty_sides >= empty_sides_required
+
+    # 돌의 개수를 계산
+    blockAmount = sum(1 for row in board for cell in row if cell != EMPTY)
+
+    # 놓인 돌이 없거나 1개이면 바둑판 중앙의 우선도를 1000만큼 높임
+    if blockAmount < 2:
+        center = BOARD_SIZE // 2
+        if priority[center][center] == EMPTY:
+            print("E")
+            priority[center][center] += 1000
+        else:
+            print("F")
+            priority[center][center+1] += 1000
+
     for x in range(BOARD_SIZE):
         for y in range(BOARD_SIZE):
-            if board[x][y] != EMPTY:
+            if is_empty(x, y):
+                # 2목을 확인하고 우선도 부여
                 for dx in range(-1, 2):
                     for dy in range(-1, 2):
-                        if dx != 0 or dy != 0:
-                            add_priority(x + dx, y + dy, 1)
+                        if dx == 0 and dy == 0:
+                            continue
+                        if check_sequence(x, y, dx, dy, color, 2, 2):
+                            add_priority(x, y, 20 if color == color else 18)
+                        if check_sequence(x, y, dx, dy, color, 2, 2):
+                            add_priority(x, y, 20 if color == get_opposite_color(color) else 18)
+                # 3목을 확인하고 우선도 부여
+                for dx in range(-1, 2):
+                    for dy in range(-1, 2):
+                        if dx == 0 and dy == 0:
+                            continue
+                        if check_sequence(x, y, dx, dy, color, 3, 1):
+                            add_priority(x, y, 99999 if color == color else 1500)
+                        if check_sequence(x, y, dx, dy, get_opposite_color(color), 3, 1):
+                            add_priority(x, y, 1500 if color == get_opposite_color(color) else 99999)
 
-    # 우선도를 기반으로 최적의 수를 찾습니다.
+    # 우선도를 기반으로 최적의 수를 찾기
     for x in range(BOARD_SIZE):
         for y in range(BOARD_SIZE):
             if priority[x][y] > max_priority:
@@ -79,7 +124,7 @@ def ai(color, board):
             elif priority[x][y] == max_priority:
                 max_coords.append((x, y))
 
-    # 가장 높은 우선도를 가진 위치 중 하나를 무작위로 선택합니다.
+    # 가장 높은 우선도를 가진 위치 중 하나를 무작위로 선택
     return random.choice(max_coords) if max_coords else None
 
 def check_win(board, stone):
@@ -114,6 +159,7 @@ while running:
             y = mouseY // CELL_SIZE
             if board[x][y] == EMPTY:
                 board[x][y] = BLACK_STONE
+                board[x][y] = 1
                 if check_win(board, BLACK_STONE):
                     winner = 'Black'
                     running = False
@@ -129,7 +175,7 @@ while running:
         current_color = BLACK_STONE  # 플레이어의 턴으로 변경
 
     # 화면 그리기
-    screen.fill(bg_color)
+    screen.fill(BOARD_COLOR)
     draw_board()
     draw_stones(board)
     pygame.display.flip()
