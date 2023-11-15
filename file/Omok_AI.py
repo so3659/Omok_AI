@@ -1,6 +1,8 @@
 import pygame
 import random
 import numpy as np
+import time
+import sys
 
 # Pygame 초기화
 pygame.init()
@@ -14,6 +16,7 @@ BOARD_WIDTH = BOARD_HEIGHT = BOARD_SIZE * CELL_SIZE
 BOARD_COLOR = (128, 128, 128)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+YELLOW = (255, 255, 0)
 GRAY = (200, 200, 200)
 
 # 게임 상태 정의
@@ -27,6 +30,42 @@ board = [[EMPTY for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
 # 화면 설정
 screen = pygame.display.set_mode((BOARD_WIDTH, BOARD_HEIGHT))
 pygame.display.set_caption("Omok Game with AI")
+
+def player_choose_color():
+    choosing = True
+    while choosing:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_b:
+                    return BLACK_STONE
+                elif event.key == pygame.K_w:
+                    return WHITE_STONE
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
+def get_opposite_color(color):
+    if color == BLACK_STONE:
+        return WHITE_STONE
+    else:
+         return BLACK_STONE
+    
+# 게임 시작 전 플레이어에게 흑돌 또는 백돌을 선택하도록 요청
+font = pygame.font.Font(None, 36)
+game_over_text = font.render("Press 'B' for Black stones or 'W' for White stones", True, WHITE)
+game_over_rect = game_over_text.get_rect()
+game_over_rect.center = (BOARD_WIDTH // 2, BOARD_HEIGHT // 2)
+screen.blit(game_over_text, game_over_rect)
+pygame.display.flip()
+player_color = player_choose_color()
+
+# 플레이어의 선택에 따라 현재 색을 설정
+if player_color == WHITE_STONE:
+    current_color = BLACK_STONE  # AI가 먼저 시작
+else:
+    current_color = player_color
+
+opponent_color = get_opposite_color(player_color)
 
 def draw_board():
     for x in range(0, BOARD_WIDTH, CELL_SIZE):
@@ -48,7 +87,7 @@ def is_on_board(x, y):
     return 0 <= x < BOARD_SIZE and 0 <= y < BOARD_SIZE
 
 def get_opposite_color(color):
-    return BLACK_STONE if color == WHITE_STONE else WHITE_STONE
+    return opponent_color if color == player_color else player_color
 
 def ai(color, board):
     # AI 알고리즘 구현 부분
@@ -86,15 +125,19 @@ def ai(color, board):
     # 놓인 돌이 없거나 1개이면 바둑판 중앙의 우선도를 1000만큼 높임
     if blockAmount < 2:
         center = BOARD_SIZE // 2
-        if priority[center][center] == EMPTY:
-            print("E")
+        if board[center][center] == EMPTY:
             priority[center][center] += 1000
         else:
-            print("F")
             priority[center][center+1] += 1000
 
     for x in range(BOARD_SIZE):
         for y in range(BOARD_SIZE):
+            # 돌 주변 빈 공간에 우선도를 설정
+            if board[x][y] != EMPTY:
+                for dx in range(-1, 2):
+                    for dy in range(-1, 2):
+                        if dx != 0 or dy != 0:
+                            add_priority(x + dx, y + dy, 1)
             if is_empty(x, y):
                 # 2목을 확인하고 우선도 부여
                 for dx in range(-1, 2):
@@ -146,40 +189,52 @@ def check_win(board, stone):
 
 # 메인 게임 루프
 running = True
-current_color = BLACK_STONE  # 게임을 시작하는 색
 winner = None
 
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN and current_color == BLACK_STONE:  # 플레이어의 턴
+        elif event.type == pygame.MOUSEBUTTONDOWN and current_color == player_color:  # 플레이어의 턴
             mouseX, mouseY = pygame.mouse.get_pos()
             x = mouseX // CELL_SIZE
             y = mouseY // CELL_SIZE
             if board[x][y] == EMPTY:
-                board[x][y] = BLACK_STONE
-                board[x][y] = 1
-                if check_win(board, BLACK_STONE):
-                    winner = 'Black'
+                board[x][y] = player_color
+                if check_win(board, player_color):
+                    winner = 'Player'
                     running = False
                 else:
-                    current_color = WHITE_STONE  # AI의 턴으로 변경
+                    current_color = opponent_color  # AI의 턴으로 변경
 
-    if current_color == WHITE_STONE and not winner:  # AI의 턴
-        x, y = ai(current_color, board)
-        board[x][y] = WHITE_STONE
-        if check_win(board, WHITE_STONE):
-            winner = 'White'
-            running = False
-        current_color = BLACK_STONE  # 플레이어의 턴으로 변경
-
-    # 화면 그리기
     screen.fill(BOARD_COLOR)
     draw_board()
     draw_stones(board)
     pygame.display.flip()
 
-pygame.quit()
+    time.sleep(0.5)
+    if current_color == opponent_color and not winner:  # AI의 턴
+        x, y = ai(current_color, board)
+        board[x][y] = opponent_color
+        if check_win(board, opponent_color):
+            winner = 'AI'
+            running = False
+        current_color = player_color  # 플레이어의 턴으로 변경
+
+    screen.fill(BOARD_COLOR)
+    draw_board()
+    draw_stones(board)
+    pygame.display.flip()
+
+
 if winner:
-    print(f"{winner} wins!")
+    font = pygame.font.Font(None, 36)
+    game_over_text = font.render(f"{winner} win!", True, YELLOW)
+    game_over_rect = game_over_text.get_rect()
+    game_over_rect.center = (BOARD_WIDTH // 2, BOARD_HEIGHT // 2)
+    screen.blit(game_over_text, game_over_rect)
+    pygame.display.flip()
+    pygame.time.wait(7000)
+
+pygame.quit()
+sys.exit()
